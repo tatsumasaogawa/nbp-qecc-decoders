@@ -7,6 +7,8 @@ from pyldpc.code import make_ldpc
 from pyldpc.encoder import encode_random_message
 from pyldpc.decoder import get_message
 
+np.set_printoptions(suppress=True)
+
 
 class TannerGraph:
     def __init__(self, variable_nodes, check_nodes):
@@ -190,7 +192,7 @@ for i in range(k):
             check_nodes[i].connect_variable_node(variable_nodes[j])
 
 syndrome = s_c_tensor.tolist()
-log_error_rate = 4.2
+log_error_rate = 3.74899243611
 
 # タナーグラフ上でのBPアルゴリズムの実行と復号
 tanner_graph = TannerGraph(variable_nodes, check_nodes)
@@ -199,10 +201,11 @@ decoded_message, error_rate = tanner_graph.decode()
 
 # print("y_tensor:", y_tensor)
 # print("y_true_tensor:", y_true_tensor)
-print("e_v_tensor", e_v_tensor.data)
+print('Syndrome pattern:', np.array(syndrome))
+print("Error pattern:", e_v_tensor.to(torch.int32).numpy())
 
-print("Decoded message:", decoded_message)
-print("Error rate:", error_rate)
+print("Decoded message:", np.array(decoded_message))
+print("Error rate:", np.array(error_rate))
 
 # for i in range(len(check_nodes)):
 #     print(check_nodes[i].message_old)
