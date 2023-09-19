@@ -166,10 +166,11 @@ if __name__ == '__main__':
     qs_fin = qs_ini.clone()  # for evaluating later
 
     print("* add noise")
-    qs_fin.x(7)  # bit flip error at #7
-    # qs_fin.z(7).x(7)  # bit and phase flip error at #7
+    # qs_fin.x(7)  # bit flip error at #7
+    qs_fin.z(7).x(7)  # bit and phase flip error at #7
     e_v = torch.tensor([0] * 4 * N ** 2, dtype=torch.float32)
     e_v[7] = 1.
+    e_v[7 + 18] = 1.
 
     syndrome = measure_syndrome(qs_fin, mval_list)
     syndrome_tensor = torch.tensor(syndrome)
@@ -201,8 +202,8 @@ class BeliefPropagation(nn.Module):
         super(BeliefPropagation, self).__init__()
         
         # 学習可能なパラメータの定義
-        self.b = nn.Parameter(torch.rand(num_nodes))
-        self.w = nn.Parameter(torch.rand(num_edges, num_nodes))
+        self.b = nn.Parameter(torch.ones(num_nodes))
+        self.w = nn.Parameter(torch.ones(num_edges, num_nodes))
 
         # b, w を 1 に固定した場合 (BP と等価)
         # self.b = torch.ones(num_nodes)
@@ -350,7 +351,8 @@ print(H_tensor)
 print('H_v_tensor')
 print(H_v_tensor)
 
-for epoch in range(100):
+history = {'epoch': [], 'loss': []}
+for epoch in range(101):
     optimizer.zero_grad()
     # print(l_v[2])
     sigma_mu_v = model(l_v=l_v, h=H_tensor, s_c=syndrome_tensor, iterations=iterations)
@@ -364,16 +366,18 @@ for epoch in range(100):
     # print(e_v)
     # print(sigma_mu_v)
 
-    loss = torch.sum(torch.sin((torch.pi / 2) * (torch.matmul(torch.matmul(H_tensor, M), e_v + sigma_mu_v))))
+    loss = torch.sum(torch.abs(torch.sin((torch.pi / 2) * (torch.matmul(torch.matmul(H_v_tensor, M), e_v + sigma_mu_v)))))
+
     # criterion = nn.BCEWithLogitsLoss()  # 二値クロスエントロピー損失関数
     # loss = criterion(sigma_mu_v, e_v)
     loss.backward()
     optimizer.step()
-    
+
     if epoch % 10 == 0:
         print(f"Epoch: {epoch}, Loss: {loss.item()}")
+        history['epoch'].append(epoch)
+        history['loss'].append(loss.item())
         print(sigma_mu_v)
-
 
 # 学習後のパラメータの値
 # print("Learned parameters:")
@@ -381,7 +385,20 @@ for epoch in range(100):
 # print("w:", model.w.data)
 
 print('Final loss:', loss.item())
-print('Error pattern:', e_v_tensor.to(torch.int32).numpy())
+print('Error pattern:', e_v.tolist())
 
 decoded_message = np.where(sigma_mu_v < 0.5, 0, 1)
 print("Decoded message:", decoded_message)
+
+
+import matplotlib.pyplot as plt
+
+fig = plt.figure()
+fig.suptitle('Learning Curve')
+ax = fig.add_subplot(111, xlabel='epoch', ylabel='loss')
+
+ax.plot(history['epoch'], history['loss'], label = 'NBP')
+ax.plot(history['epoch'], [history['loss'][0]] * 11, label = 'BP')
+
+ax.legend()
+fig.savefig('qldpc_nbp.png')
